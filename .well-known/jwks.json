@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "e": "AQAB",
+      "use": "sig",
+      "kid": "confidential-smart-2025",
+      "alg": "RS256",
+      "n": "kz1fQhg7h6ccA-6q1OL_ANgSC8H0c7Af9isHdMrrAx7cvwlSF_A0KWe2qg4RBd-qFLDI_zF0rgof72w8ut-pXO_SweIPeDJRu62UrVc54xC-Tm-Svf9VkWoVMxP6ae1qJXEavHtviomFs470Mf3zHJYFMe-yI3ORH22kqGt2JlvdImDWH8NzvrenTFSfV-1QHwQ1y-GPlpXs2jwRjvAVpXQYutHwI52fRZfIsthyOAJo4JRSK0jum7ANgk_XEk1CB7PRCanrNKYk5lA1nTb_ZGvR4lbU4JwDyW70WFGGXUHheAKuE369aw5GcUZ4GZu27ODwQZDhRyf-t_x2xUZk1Q"
+    }
+  ]
+}
