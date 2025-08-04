@@ -1,98 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
- <title>SMART on FHIR Debug</title>
- <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.min.js"></script>
- <style>
-   body { font-family: monospace; padding: 20px; }
-   .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
-   .success { background: #d4edda; }
-   .error { background: #f8d7da; }
-   .info { background: #e7f3ff; }
- </style>
+<title>SMART on FHIR Debug</title>
+<script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.min.js"></script>
+<style>
+  body { font-family: monospace; padding: 20px; }
+  .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+  .success { background: #d4edda; }
+  .error { background: #f8d7da; }
+  .info { background: #e7f3ff; }
+  .warning { background: #fff3cd; }
+</style>
 </head>
 <body>
- <h1>SMART on FHIR Debug Tool</h1>
- <div id="output">Loading...</div>
- <script>
-   function log(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section info';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
-   }
-   function logSuccess(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section success';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
-   }
-   function logError(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section error';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
-   }
-   document.getElementById('output').innerHTML = '';
-   // Check URL parameters
-   const params = new URLSearchParams(window.location.search);
-   const urlInfo = {
-     currentUrl: window.location.href,
-     referrer: document.referrer,
-     parameters: Object.fromEntries(params)
-   };
-   log('URL Information', urlInfo);
-   // Try SMART connection
-   FHIR.oauth2.ready().then(client => {
-     logSuccess('SMART Connection Successful');
-     const clientInfo = {
-       serverUrl: client.state?.serverUrl,
-       tokenType: client.state?.tokenResponse?.token_type,
-       hasAccessToken: !!client.state?.tokenResponse?.access_token,
-       scope: client.state?.tokenResponse?.scope,
-       patientId: client.patient?.id || null,
-       userId: client.user?.id || null
-     };
-     log('Client Information', clientInfo);
-     // Test basic server access
-     client.request('metadata').then(metadata => {
-       logSuccess('Server Metadata Retrieved', {
-         fhirVersion: metadata.fhirVersion,
-         software: metadata.software?.name
-       });
-     }).catch(err => {
-       logError('Metadata Request Failed', { error: err.message });
-     });
-     // Test patient access
-     if (client.patient?.id) {
-       client.patient.read().then(patient => {
-         logSuccess('Patient Data Retrieved', {
-           id: patient.id,
-           name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' '),
-           birthDate: patient.birthDate
-         });
-       }).catch(err => {
-         logError('Patient Read Failed', { error: err.message });
-       });
-     } else {
-       log('No Patient Context Available - trying general patient query');
-       client.request('Patient?_count=1').then(result => {
-         if (result.entry?.length > 0) {
-           const patient = result.entry[0].resource;
-           logSuccess('Sample Patient Retrieved', {
-             id: patient.id,
-             name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' ')
-           });
-         } else {
-           logError('No Patients Found');
-         }
-       }).catch(err => {
-         logError('Patient Query Failed', { error: err.message });
-       });
-     }
-   }).catch(err => {
-     logError('SMART Connection Failed', { error: err.message, stack: err.stack });
-   });
- </script>
+<h1>SMART on FHIR Debug Tool</h1>
+<div id="output">Loading...</div>
+<script>
+  function log(message, data = null) {
+    const div = document.createElement('div');
+    div.className = 'section info';
+    div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+    document.getElementById('output').appendChild(div);
+  }
+  function logSuccess(message, data = null) {
+    const div = document.createElement('div');
+    div.className = 'section success';
+    div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+    document.getElementById('output').appendChild(div);
+  }
+  function logError(message, data = null) {
+    const div = document.createElement('div');
+    div.className = 'section error';
+    div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+    document.getElementById('output').appendChild(div);
+  }
+  function logWarning(message, data = null) {
+    const div = document.createElement('div');
+    div.className = 'section warning';
+    div.innerHTML = `<strong>⚠️ ${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+    document.getElementById('output').appendChild(div);
+  }
+  
+  document.getElementById('output').innerHTML = '';
+  
+  // Check URL parameters
+  const params = new URLSearchParams(window.location.search);
+  const urlInfo = {
+    currentUrl: window.location.href,
+    referrer: document.referrer,
+    parameters: Object.fromEntries(params)
+  };
+  log('URL Information', urlInfo);
+  
+  // Try SMART connection
+  FHIR.oauth2.ready().then(client => {
+    logSuccess('SMART Connection Successful');
+    
+    const clientInfo = {
+      serverUrl: client.state?.serverUrl,
+      tokenType: client.state?.tokenResponse?.token_type,
+      hasAccessToken: !!client.state?.tokenResponse?.access_token,
+      scope: client.state?.tokenResponse?.scope,
+      patientId: client.patient?.id || null,
+      userId: client.user?.id || null
+    };
+    log('Client Information', clientInfo);
+    
+    // Test basic server access
+    client.request('metadata').then(metadata => {
+      logSuccess('Server Metadata Retrieved', {
+        fhirVersion: metadata.fhirVersion,
+        software: metadata.software?.name
+      });
+    }).catch(err => {
+      logError('Metadata Request Failed', { error: err.message });
+    });
+    
+    // Check patient context
+    if (client.patient?.id) {
+      logSuccess('Patient Context Found', { patientId: client.patient.id });
+      
+      // Try to read patient data
+      client.patient.read().then(patient => {
+        logSuccess('Patient Data Retrieved', {
+          id: patient.id,
+          name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' '),
+          birthDate: patient.birthDate
+        });
+        
+        // Try to get observations for this patient
+        client.request(`Observation?patient=${patient.id}&_count=5&_sort=-date`).then(observations => {
+          if (observations.entry?.length > 0) {
+            logSuccess('Patient Observations Retrieved', {
+              count: observations.entry.length,
+              totalObservations: observations.total
+            });
+          } else {
+            logWarning('No Observations Found for Patient');
+          }
+        }).catch(err => {
+          logError('Observation Query Failed', { error: err.message });
+        });
+        
+      }).catch(err => {
+        logError('Patient Read Failed', { error: err.message });
+      });
+    } else {
+      logError('No Patient Context Available', 
+        'This indicates the app was not launched from a patient chart, or there is an issue with the launch context. ' +
+        'Please ensure you are launching this app from within a specific patient record in OpenEMR.');
+    }
+    
+  }).catch(err => {
+    logError('SMART Connection Failed', { error: err.message, stack: err.stack });
+  });
+</script>
 </body>
 </html>
