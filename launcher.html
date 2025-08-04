@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>Launching SMART App</title>
+ <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.min.js"></script>
+</head>
+<body>
+ <h1>Launching SMART App...</h1>
+ <div id="status">Preparing to launch...</div>
+ <div id="debug"></div>
+ <script>
+   const params = new URLSearchParams(window.location.search);
+   const iss = params.get("iss");
+   const launch = params.get("launch");
+   
+   // Enhanced debugging - log to console
+   console.log("=== SMART Launch Debug Info ===");
+   console.log("Launch token (URL decoded):", decodeURIComponent(launch || ""));
+   console.log("Launch token length:", launch ? launch.length : 0);
+   console.log("ISS:", iss);
+   
+   // Log all URL parameters
+   const allParams = {};
+   for (const [key, value] of params) {
+     allParams[key] = value;
+   }
+   console.log("All launch parameters:", allParams);
+   console.log("Current URL:", window.location.href);
+   
+   // Enhanced debug info display
+   document.getElementById("debug").innerHTML = `
+     <h3>Debug Info:</h3>
+     <p><strong>ISS:</strong> ${iss}</p>
+     <p><strong>Launch Token:</strong> ${launch ? launch.substring(0, 50) + '...' : 'MISSING'}</p>
+     <p><strong>Launch Token Length:</strong> ${launch ? launch.length : 0}</p>
+     <p><strong>Launch Token (decoded first 100 chars):</strong> ${launch ? decodeURIComponent(launch).substring(0, 100) + '...' : 'MISSING'}</p>
+     <h4>All Parameters:</h4>
+     <pre>${JSON.stringify(allParams, null, 2)}</pre>
+   `;
+   
+   if (!iss || !launch) {
+     document.getElementById("status").innerText = "Missing 'iss' or 'launch' parameter. Please launch from OpenEMR.";
+   } else {
+     document.getElementById("status").innerText = "Redirecting to authorize...";
+     
+     FHIR.oauth2.authorize({
+       clientId: "PLACEHOLDER_CLIENT_ID",
+       scope: "launch api:oemr site:default patient/*.read",
+       redirectUri: "https://drlalithapranathi.github.io/Confidential_Smart/index.html",
+       iss: iss,
+       launch: launch
+     });
+   }
+ </script>
+</body>
+</html>
