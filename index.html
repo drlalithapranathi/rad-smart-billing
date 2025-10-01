@@ -4,95 +4,203 @@
  <title>SMART on FHIR Debug</title>
  <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.min.js"></script>
  <style>
-   body { font-family: monospace; padding: 20px; }
-   .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
-   .success { background: #d4edda; }
-   .error { background: #f8d7da; }
-   .info { background: #e7f3ff; }
+  body { font-family: monospace; padding: 20px; }
+  .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+  .success { background: #d4edda; }
+  .error { background: #f8d7da; }
+  .info { background: #e7f3ff; }
+  .encounter { background: #fff3cd; border-left: 4px solid #ffc107; }
  </style>
 </head>
 <body>
- <h1>SMART on FHIR Debug Tool</h1>
- <div id="output">Loading...</div>
- <script>
-   function log(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section info';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
+<h1>SMART on FHIR Debug Tool</h1>
+<div id="output">Loading...</div>
+<script>
+ function log(message, data = null) {
+  const div = document.createElement('div');
+  div.className = 'section info';
+  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  document.getElementById('output').appendChild(div);
+ }
+ function logSuccess(message, data = null) {
+  const div = document.createElement('div');
+  div.className = 'section success';
+  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  document.getElementById('output').appendChild(div);
+ }
+ function logError(message, data = null) {
+  const div = document.createElement('div');
+  div.className = 'section error';
+  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  document.getElementById('output').appendChild(div);
+ }
+ function logEncounter(message, data = null) {
+  const div = document.createElement('div');
+  div.className = 'section encounter';
+  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  document.getElementById('output').appendChild(div);
+ }
+ document.getElementById('output').innerHTML = '';
+ // Check URL parameters
+ const params = new URLSearchParams(window.location.search);
+ const urlInfo = {
+  currentUrl: window.location.href,
+  referrer: document.referrer,
+  parameters: Object.fromEntries(params)
+ };
+ log('URL Information', urlInfo);
+ // Try SMART connection
+ FHIR.oauth2.ready().then(client => {
+  console.log('Access Token:', client.state.tokenResponse.access_token);
+  // Get patient data without flattening
+  return client.request("Patient").then(bundle => {
+   // Handle Bundle structure directly
+   let patientId = null;
+   console.log(bundle);
+   if (bundle.resourceType === "Bundle" && bundle.entry && bundle.entry.length > 0) {
+    // Extract patient from Bundle entry
+    const patientResource = bundle.entry[0].resource;
+    patientId = patientResource.id;
+   } else if (bundle.resourceType === "Patient") {
+    // Direct Patient resource (other FHIR servers)
+    patientId = bundle.id;
    }
-   function logSuccess(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section success';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
+
+   if (!patientId) {
+    throw new Error("Could not extract patient ID");
    }
-   function logError(message, data = null) {
-     const div = document.createElement('div');
-     div.className = 'section error';
-     div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
-     document.getElementById('output').appendChild(div);
-   }
-   document.getElementById('output').innerHTML = '';
-   // Check URL parameters
-   const params = new URLSearchParams(window.location.search);
-   const urlInfo = {
-     currentUrl: window.location.href,
-     referrer: document.referrer,
-     parameters: Object.fromEntries(params)
-   };
-   log('URL Information', urlInfo);
-   // Try SMART connection
-   FHIR.oauth2.ready().then(client => {
-     logSuccess('SMART Connection Successful');
-     const clientInfo = {
-       serverUrl: client.state?.serverUrl,
-       tokenType: client.state?.tokenResponse?.token_type,
-       hasAccessToken: !!client.state?.tokenResponse?.access_token,
-       scope: client.state?.tokenResponse?.scope,
-       patientId: client.patient?.id || null,
-       userId: client.user?.id || null
-     };
-     log('Client Information', clientInfo);
-     // Test basic server access
-     client.request('metadata').then(metadata => {
-       logSuccess('Server Metadata Retrieved', {
-         fhirVersion: metadata.fhirVersion,
-         software: metadata.software?.name
-       });
-     }).catch(err => {
-       logError('Metadata Request Failed', { error: err.message });
-     });
-     // Test patient access
-     if (client.patient?.id) {
-       client.patient.read().then(patient => {
-         logSuccess('Patient Data Retrieved', {
-           id: patient.id,
-           name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' '),
-           birthDate: patient.birthDate
-         });
-       }).catch(err => {
-         logError('Patient Read Failed', { error: err.message });
-       });
+
+   console.log("Patient ID:", patientId);
+   // 1. Get and display patient details
+   client.request(`Patient/${patientId}`).then(patient => {
+    const patientDisplay = {
+     name: `${patient.name?.[0]?.given?.join(' ')} ${patient.name?.[0]?.family}`,
+     birthDate: patient.birthDate,
+     gender: patient.gender,
+     id: patient.id
+    };
+    logSuccess('Patient Details', patientDisplay);
+    console.log('Patient:', patientDisplay);
+    const patientName = patientDisplay.name;
+
+    // 2. Get most recent conditions
+    client.request(`Condition?patient=${patientId}`).then(conditions => {
+     if (conditions.entry && conditions.entry.length > 0) {
+      // Just show the most recent condition (first one if they're sorted)
+      const mostRecent = conditions.entry[0].resource;
+      const code = mostRecent.code?.coding?.[0]?.code;
+      const display = mostRecent.code?.coding?.[0]?.display ||
+              mostRecent.code?.text ||
+              `Code: ${code}`;
+
+      logSuccess(`Most Recent Diagnosis: ${display}`, {
+       code: code,
+       status: mostRecent.clinicalStatus?.coding?.[0]?.display,
+       patient: patientName
+      });
+
+      // Optional: show all conditions if you want
+      if (conditions.entry.length > 1) {
+       log(`Total conditions found: ${conditions.entry.length}`);
+      }
      } else {
-       log('No Patient Context Available - trying general patient query');
-       client.request('Patient?_count=1').then(result => {
-         if (result.entry?.length > 0) {
-           const patient = result.entry[0].resource;
-           logSuccess('Sample Patient Retrieved', {
-             id: patient.id,
-             name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' ')
-           });
-         } else {
-           logError('No Patients Found');
-         }
-       }).catch(err => {
-         logError('Patient Query Failed', { error: err.message });
-       });
+      log('No conditions found for this patient');
      }
-   }).catch(err => {
-     logError('SMART Connection Failed', { error: err.message, stack: err.stack });
+    }).catch(err => console.error('Conditions error:', err));
+
+    // 3. Get recent observations (including vital signs)
+    client.request("Observation").then(bundle => {
+     console.log('Observation bundle:', bundle);
+     if (bundle.resourceType === "Bundle" && bundle.entry && bundle.entry.length > 0) {
+      const observations = bundle.entry.slice(0, 30); // First 30 observations
+      const obsData = observations.map(entry => {
+       const obs = entry.resource;
+       return {
+        code: obs.code?.coding?.[0]?.code,
+        display: obs.code?.coding?.[0]?.display || obs.code?.text,
+        value: obs.valueQuantity?.value + ' ' + obs.valueQuantity?.unit ||
+                obs.valueString ||
+                (obs.component?.length > 0 ?
+                        obs.component.map(c =>
+                                `${c.code?.coding?.[0]?.display}: ${c.valueQuantity?.value} ${c.valueQuantity?.unit}`
+                        ).join(', ') : null) ||
+                'No value recorded',
+        effectiveDateTime: obs.effectiveDateTime,
+        status: obs.status
+       };
+      });
+
+      logSuccess(`Observations`, obsData);
+
+     } else {
+      log('No observations found for this patient');
+     }
+    }).catch(err => console.error('Observations error:', err));
+
+   }).catch(err => console.error('Patient error:', err));
+
+
+
+   // Use the extracted patient ID for other requests
+   return client.request(`Observation?patient=${patientId}`, {
+    pageLimit: 0,
+    flat: true
    });
- </script>
+  });
+
+  logSuccess('SMART Connection Successful');
+
+  const clientInfo = {
+   serverUrl: client.state?.serverUrl,
+   tokenType: client.state?.tokenResponse?.token_type,
+   hasAccessToken: client.state?.tokenResponse?.access_token,
+   scope: client.state?.tokenResponse?.scope,
+   patientId: client|| null,
+   userId: client.user?.id || null
+  };
+  log('Client Information', clientInfo);
+
+  // Test basic server access
+  client.request('metadata').then(metadata => {
+   logSuccess('Server Metadata Retrieved', {
+    fhirVersion: metadata.fhirVersion,
+    software: metadata.software?.name
+   });
+  }).catch(err => {
+   logError('Metadata Request Failed', { error: err.message });
+  });
+
+  // Test patient access
+  if (client.patient?.id) {
+   client.patient.read().then(patient => {
+    logSuccess('Patient Data Retrieved', {
+     id: patient.id,
+     name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' '),
+     birthDate: patient.birthDate
+    });
+   }).catch(err => {
+    logError('Patient Read Failed', { error: err.message });
+   });
+  } else {
+   log('No Patient Context Available - trying general patient query');
+   client.request('Patient?_count=1').then(result => {
+    if (result.entry?.length > 0) {
+     const patient = result.entry[0].resource;
+     logSuccess('Sample Patient Retrieved', {
+      id: patient.id,
+      name: patient.name?.[0]?.family + ', ' + patient.name?.[0]?.given?.join(' ')
+     });
+    } else {
+     logError('No Patients Found');
+    }
+   }).catch(err => {
+    logError('Patient Query Failed', { error: err.message });
+   });
+  }
+ }).catch(err => {
+  logError('SMART Connection Failed', { error: err.message, stack: err.stack });
+ });
+
+</script>
 </body>
 </html>
