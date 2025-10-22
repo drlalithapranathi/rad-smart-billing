@@ -44,11 +44,12 @@
      document.getElementById("status").innerText = "Redirecting to authorize...";
      
      FHIR.oauth2.authorize({
-       clientId: "G-0ipuAaMvjvMD1toSiV7SWobhIQaG7wzuBjknneOKs",
-       scope: "openid fhirUser launch launch/patient api:oemr site:default patient/Patient.read patient/Observation.read",
-       redirectUri: "https://drlalithapranathi.github.io/Confidential_Smart/index.html",
+       clientId: "gq0040TjgwdnTWIHDDcLaholh-ideB4h9XthqstKDiw",
+       scope: "openid fhirUser online_access launch launch/patient api:oemr api:fhir api:port site:default patient/AllergyIntolerance.read patient/Appointment.read patient/Binary.read patient/CarePlan.read patient/CareTeam.read patient/Condition.read patient/Coverage.read patient/Device.read patient/DiagnosticReport.read patient/DocumentReference.$docref patient/DocumentReference.read patient/Encounter.read patient/Goal.read patient/Immunization.read patient/Location.read patient/Medication.read patient/MedicationRequest.read patient/Observation.read patient/Organization.read patient/Patient.read patient/Person.read patient/Practitioner.read patient/Procedure.read patient/Provenance.read user/Condition.read user/Observation.read user/Patient.read user/Encounter.read user/AllergyIntolerance.read user/Appointment.read user/Binary.read user/CarePlan.read user/CareTeam.read user/Coverage.read user/Device.read user/DiagnosticReport.read user/DocumentReference.$docref user/DocumentReference.read user/Goal.read user/Immunization.read user/Location.read user/Medication.read user/MedicationRequest.read user/Organization.read user/Organization.write user/Patient.write user/Person.read user/Practitioner.read user/Practitioner.write user/PractitionerRole.read user/Procedure.read user/Provenance.read user/ValueSet.read",
+       redirectUri: "https://oemr.b691.us/smart-apps/Confidential_Smart/",
        iss: iss,
-       launch: launch
+       launch: launch,
+       completeInTarget: true
      });
    }
  </script>
