@@ -1,46 +1,440 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+ <meta charset="utf-8" />
  <title>SMART on FHIR Debug</title>
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
  <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.min.js"></script>
  <style>
-  body { font-family: monospace; padding: 20px; }
-  .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
-  .success { background: #d4edda; }
-  .error { background: #f8d7da; }
-  .info { background: #e7f3ff; }
-  .encounter { background: #fff3cd; border-left: 4px solid #ffc107; }
+  :root{
+   /* Light vibrant theme */
+   --bg1:#f7fbff;
+   --bg2:#eef4ff;
+   --panel:rgba(255,255,255,0.88);
+   --panel-blur:10px;
+   --text:#0b1220;
+   --muted:#657094;
+   --border:#e6ecff;
+   --ok:#12b886;
+   --warn:#f59f00;
+   --err:#e03131;
+   --info:#3b82f6;
+   --hdr:#f2f5ff;
+   --accent:#3b82f6;
+   --accent-2:#8b5cf6;
+   --chip:#eef2ff;
+   --shadow:0 18px 40px rgba(30,55,135,.12), 0 4px 14px rgba(30,55,135,.06);
+   --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+   padding:26px;
+   background:
+           radial-gradient(1200px 800px at -10% -20%, #e9f6ff 10%, transparent 60%),
+           radial-gradient(1200px 800px at 110% -10%, #f0eaff 10%, transparent 60%),
+           linear-gradient(180deg,var(--bg1),var(--bg2));
+   color:var(--text);
+   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  }
+  header{
+   display:flex;
+   align-items:center;
+   justify-content:space-between;
+   gap:12px;
+   margin-bottom:24px;
+  }
+  .app-title{
+   font-weight:900;
+   letter-spacing:.2px;
+   font-size:clamp(24px,2.6vw,34px);
+   background:linear-gradient(90deg,#0f172a,#334155);
+   -webkit-background-clip:text;
+   background-clip:text;
+   color:transparent;
+  }
+  .subtitle{
+   color:var(--muted);
+   font-size:.95rem;
+   margin-top:4px;
+  }
+  #output{
+   display:grid;
+   gap:18px;
+   grid-template-columns:repeat(auto-fit, minmax(400px, 1fr));
+  }
+  @media (max-width:640px){
+   #output{grid-template-columns:1fr}
+  }
+  .section{
+   position:relative;
+   background:var(--panel);
+   border:1px solid var(--border);
+   border-radius:var(--radius);
+   padding:20px;
+   box-shadow:var(--shadow);
+   backdrop-filter: blur(var(--panel-blur));
+   transform: translateZ(0);
+   overflow:hidden;
+  }
+  .section::after{
+   content:"";
+   position:absolute;
+   inset:-1px -1px auto auto;
+   width:180px;
+   height:180px;
+   border-radius:50%;
+   background: radial-gradient(closest-side,rgba(139,92,246,.10),transparent 80%);
+   filter: blur(8px);
+   pointer-events:none;
+   transform: translate(40%, -40%);
+  }
+  .section-header{
+   display:flex;
+   align-items:center;
+   gap:10px;
+   font-size:1.1rem;
+   font-weight:800;
+   letter-spacing:.2px;
+   margin-bottom:16px;
+   color:#0f172a;
+  }
+  .status-dot{
+   display:inline-block;
+   width:10px;
+   height:10px;
+   border-radius:50%;
+   flex-shrink:0;
+  }
+  .section.success{
+   border-left:4px solid var(--ok);
+  }
+  .section.success .status-dot{
+   background:var(--ok);
+   box-shadow:0 0 12px var(--ok);
+  }
+  .section.error{
+   border-left:4px solid var(--err);
+  }
+  .section.error .status-dot{
+   background:var(--err);
+   box-shadow:0 0 12px var(--err);
+  }
+  .section.info{
+   border-left:4px solid var(--info);
+  }
+  .section.info .status-dot{
+   background:var(--info);
+   box-shadow:0 0 12px var(--info);
+  }
+  .section.encounter{
+   border-left:4px solid var(--warn);
+  }
+  .section.encounter .status-dot{
+   background:var(--warn);
+   box-shadow:0 0 12px var(--warn);
+  }
+
+  /* Key-Value Display */
+  .kv-grid{
+   display:grid;
+   grid-template-columns: 140px 1fr;
+   gap:12px 16px;
+   font-size:.95rem;
+  }
+  .kv-grid .key{
+   color:#64748b;
+   font-weight:600;
+   font-size:.88rem;
+   text-transform:uppercase;
+   letter-spacing:.5px;
+  }
+  .kv-grid .value{
+   color:#0f172a;
+   font-weight:500;
+   word-break:break-word;
+  }
+  .mono{
+   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+   background:#f1f5f9;
+   padding:2px 6px;
+   border-radius:4px;
+   font-size:.9em;
+  }
+
+  /* List Display */
+  .item-list{
+   display:flex;
+   flex-direction:column;
+   gap:12px;
+  }
+  .item{
+   background:linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+   border:1px solid var(--border);
+   border-radius:12px;
+   padding:14px 16px;
+  }
+  .item-title{
+   font-weight:700;
+   color:#0f172a;
+   margin-bottom:6px;
+   font-size:.95rem;
+  }
+  .item-meta{
+   display:flex;
+   flex-wrap:wrap;
+   gap:8px 16px;
+   font-size:.85rem;
+   color:var(--muted);
+  }
+  .item-meta span{
+   display:flex;
+   align-items:center;
+   gap:4px;
+  }
+  .item-meta .label{
+   color:#64748b;
+   font-weight:600;
+  }
+
+  /* Badges */
+  .badge{
+   display:inline-flex;
+   align-items:center;
+   padding:4px 10px;
+   border-radius:999px;
+   font-size:.8rem;
+   font-weight:600;
+   background:var(--chip);
+   border:1px solid var(--border);
+  }
+  .badge.success{background:#d1fae5;color:#065f46;border-color:#86efac}
+  .badge.warning{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+  .badge.error{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+
+  /* Collapsible JSON */
+  .json-toggle{
+   display:inline-block;
+   margin-top:8px;
+   padding:6px 12px;
+   background:#f1f5f9;
+   border:1px solid #cbd5e1;
+   border-radius:6px;
+   font-size:.85rem;
+   color:#475569;
+   cursor:pointer;
+   transition:all .2s;
+  }
+  .json-toggle:hover{
+   background:#e2e8f0;
+   color:#334155;
+  }
+  .json-content{
+   display:none;
+   background:#1e293b;
+   border-radius:12px;
+   padding:16px;
+   overflow-x:auto;
+   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+   font-size:.85rem;
+   line-height:1.6;
+   margin-top:12px;
+   color:#e2e8f0;
+  }
+  .json-content.show{display:block}
+
+  .loading{
+   text-align:center;
+   padding:60px 20px;
+   color:var(--muted);
+   font-size:1.1rem;
+  }
+  .loading::after{
+   content:"...";
+   animation:dots 1.5s infinite;
+  }
+  @keyframes dots{
+   0%, 20%{content:"..."}
+   40%{content:""}
+   60%{content:"."}
+   80%{content:".."}
+  }
+
+  .empty-state{
+   padding:24px;
+   text-align:center;
+   color:var(--muted);
+   font-style:italic;
+  }
  </style>
 </head>
 <body>
-<h1>SMART on FHIR Debug Tool</h1>
-<div id="output">Loading...</div>
+<header>
+ <div>
+  <div class="app-title">SMART on FHIR Debug</div>
+  <div class="subtitle">Diagnostic & Connection Tool</div>
+ </div>
+</header>
+<div id="output" class="loading">Initializing SMART connection</div>
+
 <script>
+ let jsonCounter = 0;
+
+ function createKV(pairs) {
+  const grid = document.createElement('div');
+  grid.className = 'kv-grid';
+  pairs.forEach(([key, value]) => {
+   const keyEl = document.createElement('div');
+   keyEl.className = 'key';
+   keyEl.textContent = key;
+   const valueEl = document.createElement('div');
+   valueEl.className = 'value';
+   valueEl.innerHTML = value || '<span style="color:var(--muted)">—</span>';
+   grid.appendChild(keyEl);
+   grid.appendChild(valueEl);
+  });
+  return grid;
+ }
+
+ function createJsonToggle(data) {
+  const id = `json-${jsonCounter++}`;
+  const container = document.createElement('div');
+  const toggle = document.createElement('span');
+  toggle.className = 'json-toggle';
+  toggle.textContent = '📋 View Raw JSON';
+  toggle.onclick = () => {
+   const content = document.getElementById(id);
+   content.classList.toggle('show');
+   toggle.textContent = content.classList.contains('show') ? '📋 Hide Raw JSON' : '📋 View Raw JSON';
+  };
+  const content = document.createElement('pre');
+  content.id = id;
+  content.className = 'json-content';
+  content.textContent = JSON.stringify(data, null, 2);
+  container.appendChild(toggle);
+  container.appendChild(content);
+  return container;
+ }
+
  function log(message, data = null) {
   const div = document.createElement('div');
   div.className = 'section info';
-  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `<span class="status-dot"></span>${message}`;
+  div.appendChild(header);
+
+  if (data) {
+   if (data.currentUrl || data.serverUrl) {
+    // URL info display
+    const pairs = [];
+    if (data.currentUrl) pairs.push(['Current URL', `<span class="mono">${data.currentUrl}</span>`]);
+    if (data.referrer) pairs.push(['Referrer', `<span class="mono">${data.referrer}</span>`]);
+    if (data.serverUrl) pairs.push(['Server URL', `<span class="mono">${data.serverUrl}</span>`]);
+    if (data.tokenType) pairs.push(['Token Type', data.tokenType]);
+    if (data.scope) pairs.push(['Scope', data.scope]);
+    if (data.patientId) pairs.push(['Patient ID', `<span class="mono">${data.patientId}</span>`]);
+    div.appendChild(createKV(pairs));
+   } else {
+    div.appendChild(createJsonToggle(data));
+   }
+  }
+
   document.getElementById('output').appendChild(div);
  }
+
  function logSuccess(message, data = null) {
   const div = document.createElement('div');
   div.className = 'section success';
-  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `<span class="status-dot"></span>${message}`;
+  div.appendChild(header);
+
+  if (data) {
+   if (data.name && data.birthDate) {
+    // Patient details
+    div.appendChild(createKV([
+     ['Name', `<strong>${data.name}</strong>`],
+     ['Date of Birth', data.birthDate],
+     ['Gender', data.gender || '—'],
+     ['Patient ID', `<span class="mono">${data.id}</span>`]
+    ]));
+   } else if (data.code && data.status) {
+    // Diagnosis
+    div.appendChild(createKV([
+     ['Code', `<span class="mono">${data.code}</span>`],
+     ['Status', `<span class="badge ${data.status?.includes('active') ? 'success' : 'warning'}">${data.status}</span>`],
+     ['Patient', data.patient]
+    ]));
+   } else if (data.fhirVersion) {
+    // Server metadata
+    div.appendChild(createKV([
+     ['FHIR Version', `<span class="mono">${data.fhirVersion}</span>`],
+     ['Software', data.software || '—']
+    ]));
+   } else if (Array.isArray(data)) {
+    // Observations list
+    const list = document.createElement('div');
+    list.className = 'item-list';
+    data.forEach(obs => {
+     const item = document.createElement('div');
+     item.className = 'item';
+     item.innerHTML = `
+              <div class="item-title">${obs.display || 'Unknown'}</div>
+              <div class="item-meta">
+                <span><span class="label">Code:</span> <span class="mono">${obs.code || '—'}</span></span>
+                <span><span class="label">Value:</span> ${obs.value || '—'}</span>
+                <span><span class="label">Status:</span> <span class="badge ${obs.status === 'final' ? 'success' : 'warning'}">${obs.status || '—'}</span></span>
+                ${obs.effectiveDateTime ? `<span><span class="label">Date:</span> ${new Date(obs.effectiveDateTime).toLocaleString()}</span>` : ''}
+              </div>
+            `;
+     list.appendChild(item);
+    });
+    div.appendChild(list);
+   } else {
+    div.appendChild(createKV(Object.entries(data).map(([k, v]) => [k, String(v)])));
+   }
+  }
+
   document.getElementById('output').appendChild(div);
  }
+
  function logError(message, data = null) {
   const div = document.createElement('div');
   div.className = 'section error';
-  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `<span class="status-dot"></span>${message}`;
+  div.appendChild(header);
+
+  if (data) {
+   div.appendChild(createKV([
+    ['Error', data.error || '—'],
+    ['Stack', data.stack ? `<span class="mono">${data.stack}</span>` : '—']
+   ]));
+  }
+
   document.getElementById('output').appendChild(div);
  }
+
  function logEncounter(message, data = null) {
   const div = document.createElement('div');
   div.className = 'section encounter';
-  div.innerHTML = `<strong>${message}</strong>` + (data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : '');
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `<span class="status-dot"></span>${message}`;
+  div.appendChild(header);
+
+  if (data) {
+   div.appendChild(createJsonToggle(data));
+  }
+
   document.getElementById('output').appendChild(div);
  }
+
  document.getElementById('output').innerHTML = '';
+
  // Check URL parameters
  const params = new URLSearchParams(window.location.search);
  const urlInfo = {
@@ -49,9 +443,21 @@
   parameters: Object.fromEntries(params)
  };
  log('URL Information', urlInfo);
+
  // Try SMART connection
  FHIR.oauth2.ready().then(client => {
   console.log('Access Token:', client.state.tokenResponse.access_token);
+  console.log('Full token response:', client.state.tokenResponse);
+  console.log('Patient context:', client.state.tokenResponse.patient);
+  console.log('Client state serverUrl:', client.state.serverUrl);
+  console.log('Launch parameter:', client.state.authorizeUri);
+  if (client.state.tokenResponse.patient) {
+   console.log('Patient from token:', client.state.tokenResponse.patient);
+  }
+  if (client.state.tokenResponse.encounter) {
+   console.log('Encounter from token:', client.state.tokenResponse.encounter);
+  }
+
   // Get patient data without flattening
   return client.request("Patient").then(bundle => {
    // Handle Bundle structure directly
@@ -71,6 +477,7 @@
    }
 
    console.log("Patient ID:", patientId);
+
    // 1. Get and display patient details
    client.request(`Patient/${patientId}`).then(patient => {
     const patientDisplay = {
@@ -95,7 +502,7 @@
 
       logSuccess(`Most Recent Diagnosis: ${display}`, {
        code: code,
-       status: mostRecent.clinicalStatus?.coding?.[0]?.display,
+       status: mostRecent.clinicalStatus?.coding?.[0]?.display || 'Unknown',
        patient: patientName
       });
 
@@ -130,7 +537,7 @@
        };
       });
 
-      logSuccess(`Observations`, obsData);
+      logSuccess(`Observations (${obsData.length} total)`, obsData);
 
      } else {
       log('No observations found for this patient');
@@ -138,8 +545,6 @@
     }).catch(err => console.error('Observations error:', err));
 
    }).catch(err => console.error('Patient error:', err));
-
-
 
    // Use the extracted patient ID for other requests
    return client.request(`Observation?patient=${patientId}`, {
@@ -153,9 +558,8 @@
   const clientInfo = {
    serverUrl: client.state?.serverUrl,
    tokenType: client.state?.tokenResponse?.token_type,
-   hasAccessToken: client.state?.tokenResponse?.access_token,
    scope: client.state?.tokenResponse?.scope,
-   patientId: client|| null,
+   patientId: client.patient?.id || null,
    userId: client.user?.id || null
   };
   log('Client Information', clientInfo);
@@ -200,7 +604,6 @@
  }).catch(err => {
   logError('SMART Connection Failed', { error: err.message, stack: err.stack });
  });
-
 </script>
 </body>
 </html>
