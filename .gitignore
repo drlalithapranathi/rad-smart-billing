@@ -1,0 +1,21 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Project specific - don't commit
+unknown.ipynb
+*.ipynb
+.nojekyll
+launcher.html
+index.html
+.well-known/
+Screenshot*.png
+README.md

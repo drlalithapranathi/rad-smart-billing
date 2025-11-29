@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Claims – Epic FHIR Test Mode</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg1:#f7fbff;
+      --bg2:#eef4ff;
+      --panel:rgba(255,255,255,0.88);
+      --panel-blur:10px;
+      --text:#0b1220;
+      --muted:#657094;
+      --border:#e6ecff;
+      --ok:#12b886;
+      --warn:#f59f00;
+      --err:#e03131;
+      --hdr:#f2f5ff;
+      --accent:#3b82f6;
+      --accent-2:#8b5cf6;
+      --chip:#eef2ff;
+      --shadow:0 18px 40px rgba(30,55,135,.12), 0 4px 14px rgba(30,55,135,.06);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; padding:26px;
+      background:
+        radial-gradient(1200px 800px at -10% -20%, #e9f6ff 10%, transparent 60%),
+        radial-gradient(1200px 800px at 110% -10%, #f0eaff 10%, transparent 60%),
+        linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    }
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+    .app-title{font-weight:900;letter-spacing:.2px;font-size:clamp(24px,2.6vw,34px);background:linear-gradient(90deg,#0f172a,#334155);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .subtitle{color:var(--muted);font-size:.95rem}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:6px 12px;border-radius:999px;
+      background:var(--chip);border:1px solid var(--border);
+      font-size:.8rem;color:#334155; backdrop-filter:saturate(130%) blur(6px)
+    }
+    .badge.ok{color:var(--ok)} .badge.warn{color:var(--warn)} .badge.err{color:var(--err)}
+    .grid{display:grid;gap:18px;grid-template-columns:repeat(12,1fr)}
+    @media (max-width:980px){.grid{grid-template-columns:repeat(6,1fr)}}
+    @media (max-width:640px){.grid{grid-template-columns:repeat(1,1fr)}}
+    .span-3{grid-column:span 3} .span-4{grid-column:span 4} .span-6{grid-column:span 6} .span-12{grid-column:span 12}
+    @media (max-width:980px){.span-3{grid-column:span 6}.span-4{grid-column:span 6}}
+    .card{
+      position:relative;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:16px 16px 10px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(var(--panel-blur));
+    }
+    .card h3{margin:0 0 12px; font-size:1rem; font-weight:800;}
+    .patient-card{
+      cursor:pointer;
+      transition: all 0.2s;
+      border:2px solid var(--border);
+    }
+    .patient-card:hover{
+      border-color:var(--accent);
+      box-shadow:0 8px 30px rgba(59,130,246,.2);
+      transform: translateY(-2px);
+    }
+    .patient-card.selected{
+      border-color:var(--accent);
+      background:rgba(59,130,246,.05);
+    }
+    .patient-name{font-weight:700;color:#0f172a;font-size:1.1rem;margin-bottom:4px}
+    .patient-info{color:var(--muted);font-size:0.85rem}
+    .kv{
+      display:grid; grid-template-columns: 140px 1fr;
+      gap:8px 12px; font-size:.95rem;
+    }
+    .kv b{ color:#334155; font-weight:700;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#0f172a}
+    .loading{text-align:center;padding:40px;color:var(--muted)}
+    .back-btn{
+      display:inline-block;
+      padding:8px 16px;
+      background:var(--accent);
+      color:white;
+      text-decoration:none;
+      border-radius:8px;
+      font-size:0.9rem;
+      font-weight:600;
+      transition:background 0.2s;
+    }
+    .back-btn:hover{background:#2563eb}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="app-title">Smart Claims - Test Mode</div>
+      <div class="subtitle">Epic FHIR Integration (No Auth)</div>
+    </div>
+    <div class="chips">
+      <span class="badge warn">Test Mode</span>
+      <span class="badge">No OAuth</span>
+      <a href="index.html" class="back-btn">OAuth Mode</a>
+    </div>
+  </header>
+
+  <div id="app" class="grid">
+    <div class="card span-12">
+      <div class="loading">Loading test patients...</div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let allPatients = [];
+    let selectedPatient = null;
+    let patientData = {};
+
+    async function fetchTestPatients() {
+      try {
+        const response = await fetch(`${API_BASE}/epic/test/patients`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch test patients');
+        }
+
+        const data = await response.json();
+        allPatients = data.entry || [];
+        displayPatientList();
+      } catch (error) {
+        console.error('Error fetching test patients:', error);
+        document.getElementById('app').innerHTML = `
+          <div class="card span-12">
+            <h3>Error</h3>
+            <p style="color: var(--err);">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function displayPatientList() {
+      const app = document.getElementById('app');
+
+      if (allPatients.length === 0) {
+        app.innerHTML = `
+          <div class="card span-12">
+            <h3>No Patients Found</h3>
+            <p>No test patients available in Epic sandbox.</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <div class="card span-12">
+          <h3>Select a Test Patient (${allPatients.length} available)</h3>
+          <p style="color: var(--muted); margin-bottom: 0;">Click on any patient to view their full medical record</p>
+        </div>
+      `;
+
+      // Display patients as cards
+      allPatients.forEach((entry, idx) => {
+        const patient = entry.resource;
+        const name = patient.name?.[0];
+        const fullName = name ?
+          [name.given?.join(' '), name.family].filter(Boolean).join(' ') :
+          'Unknown';
+        const birthDate = patient.birthDate || 'Unknown';
+        const gender = patient.gender || 'Unknown';
+        const id = patient.id;
+
+        html += `
+          <div class="card patient-card span-3" onclick="selectPatient('${id}')">
+            <div class="patient-name">${fullName}</div>
+            <div class="patient-info">
+              DOB: ${birthDate}<br>
+              Gender: ${gender}<br>
+              <span class="mono" style="font-size:0.75rem">ID: ${id}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      app.innerHTML = html;
+    }
+
+    async function selectPatient(patientId) {
+      selectedPatient = patientId;
+
+      // Show loading state
+      document.getElementById('app').innerHTML = `
+        <div class="card span-12">
+          <div class="loading">Loading patient data...</div>
+        </div>
+      `;
+
+      try {
+        // Fetch patient data and all resources in parallel
+        const [patient, observations, conditions, medications, procedures] = await Promise.all([
+          fetch(`${API_BASE}/epic/test/patient/${patientId}`).then(r => r.json()),
+          fetch(`${API_BASE}/epic/test/patient/${patientId}/Observation`).then(r => r.json()),
+          fetch(`${API_BASE}/epic/test/patient/${patientId}/Condition`).then(r => r.json()),
+          fetch(`${API_BASE}/epic/test/patient/${patientId}/MedicationRequest`).then(r => r.json()),
+          fetch(`${API_BASE}/epic/test/patient/${patientId}/Procedure`).then(r => r.json())
+        ]);
+
+        patientData = { patient, observations, conditions, medications, procedures };
+        displayPatientDetails();
+      } catch (error) {
+        console.error('Error fetching patient details:', error);
+        document.getElementById('app').innerHTML = `
+          <div class="card span-12">
+            <h3>Error</h3>
+            <p style="color: var(--err);">Failed to load patient data: ${error.message}</p>
+            <button onclick="displayPatientList()" class="back-btn">Back to Patient List</button>
+          </div>
+        `;
+      }
+    }
+
+    function displayPatientDetails() {
+      const app = document.getElementById('app');
+      const patient = patientData.patient;
+
+      const name = patient.name?.[0];
+      const fullName = name ?
+        [name.given?.join(' '), name.family].filter(Boolean).join(' ') :
+        'Unknown';
+
+      const birthDate = patient.birthDate || 'Unknown';
+      const gender = patient.gender || 'Unknown';
+      const id = patient.id || 'Unknown';
+
+      let html = `
+        <div class="card span-12" style="background: rgba(59,130,246,.05);">
+          <button onclick="displayPatientList()" class="back-btn" style="margin-bottom: 12px;">← Back to Patient List</button>
+          <h3>Patient Demographics</h3>
+          <div class="kv">
+            <b>Name:</b><span>${fullName}</span>
+            <b>Patient ID:</b><span class="mono">${id}</span>
+            <b>Birth Date:</b><span>${birthDate}</span>
+            <b>Gender:</b><span>${gender}</span>
+          </div>
+        </div>
+      `;
+
+      // Observations
+      html += displayObservations();
+
+      // Conditions
+      html += displayConditions();
+
+      // Medications
+      html += displayMedications();
+
+      // Procedures
+      html += displayProcedures();
+
+      app.innerHTML = html;
+    }
+
+    function displayObservations() {
+      const obs = patientData.observations;
+      if (!obs || !obs.entry || obs.entry.length === 0) {
+        return `
+          <div class="card span-6">
+            <h3>Observations</h3>
+            <p style="color: var(--muted);">No observations found</p>
+          </div>
+        `;
+      }
+
+      const entries = obs.entry.slice(0, 10).map(e => {
+        const resource = e.resource;
+        const code = resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown';
+        const value = resource.valueQuantity
+          ? `${resource.valueQuantity.value} ${resource.valueQuantity.unit || ''}`
+          : resource.valueString || resource.valueCodeableConcept?.text || 'N/A';
+        const date = resource.effectiveDateTime?.split('T')[0] || 'Unknown date';
+
+        return `
+          <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <div style="font-weight: 600; color: #334155;">${code}</div>
+            <div style="color: var(--muted); font-size: 0.9rem;">${value} • ${date}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="card span-6">
+          <h3>Observations (${obs.total || obs.entry.length})</h3>
+          ${entries}
+          ${obs.entry.length > 10 ? '<p style="color: var(--muted); margin-top: 8px;">Showing first 10 results</p>' : ''}
+        </div>
+      `;
+    }
+
+    function displayConditions() {
+      const cond = patientData.conditions;
+      if (!cond || !cond.entry || cond.entry.length === 0) {
+        return `
+          <div class="card span-6">
+            <h3>Conditions</h3>
+            <p style="color: var(--muted);">No conditions found</p>
+          </div>
+        `;
+      }
+
+      const entries = cond.entry.slice(0, 10).map(e => {
+        const resource = e.resource;
+        const condition = resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown';
+        const status = resource.clinicalStatus?.coding?.[0]?.code || 'unknown';
+        const onset = resource.onsetDateTime?.split('T')[0] || resource.onsetPeriod?.start?.split('T')[0] || 'Unknown';
+
+        return `
+          <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <div style="font-weight: 600; color: #334155;">${condition}</div>
+            <div style="color: var(--muted); font-size: 0.9rem;">
+              <span class="badge ${status === 'active' ? 'ok' : ''}" style="padding: 2px 8px; font-size: 0.75rem;">${status}</span>
+              • Onset: ${onset}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="card span-6">
+          <h3>Conditions (${cond.total || cond.entry.length})</h3>
+          ${entries}
+          ${cond.entry.length > 10 ? '<p style="color: var(--muted); margin-top: 8px;">Showing first 10 results</p>' : ''}
+        </div>
+      `;
+    }
+
+    function displayMedications() {
+      const meds = patientData.medications;
+      if (!meds || !meds.entry || meds.entry.length === 0) {
+        return `
+          <div class="card span-6">
+            <h3>Medications</h3>
+            <p style="color: var(--muted);">No medications found</p>
+          </div>
+        `;
+      }
+
+      const entries = meds.entry.slice(0, 10).map(e => {
+        const resource = e.resource;
+        const medication = resource.medicationCodeableConcept?.text ||
+                          resource.medicationCodeableConcept?.coding?.[0]?.display ||
+                          'Unknown medication';
+        const status = resource.status || 'unknown';
+        const authored = resource.authoredOn?.split('T')[0] || 'Unknown date';
+
+        return `
+          <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <div style="font-weight: 600; color: #334155;">${medication}</div>
+            <div style="color: var(--muted); font-size: 0.9rem;">
+              <span class="badge ${status === 'active' ? 'ok' : ''}" style="padding: 2px 8px; font-size: 0.75rem;">${status}</span>
+              • ${authored}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="card span-6">
+          <h3>Medications (${meds.total || meds.entry.length})</h3>
+          ${entries}
+          ${meds.entry.length > 10 ? '<p style="color: var(--muted); margin-top: 8px;">Showing first 10 results</p>' : ''}
+        </div>
+      `;
+    }
+
+    function displayProcedures() {
+      const procs = patientData.procedures;
+      if (!procs || !procs.entry || procs.entry.length === 0) {
+        return `
+          <div class="card span-6">
+            <h3>Procedures</h3>
+            <p style="color: var(--muted);">No procedures found</p>
+          </div>
+        `;
+      }
+
+      const entries = procs.entry.slice(0, 10).map(e => {
+        const resource = e.resource;
+        const procedure = resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown procedure';
+        const status = resource.status || 'unknown';
+        const performed = resource.performedDateTime?.split('T')[0] ||
+                         resource.performedPeriod?.start?.split('T')[0] ||
+                         'Unknown date';
+
+        return `
+          <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <div style="font-weight: 600; color: #334155;">${procedure}</div>
+            <div style="color: var(--muted); font-size: 0.9rem;">
+              <span class="badge" style="padding: 2px 8px; font-size: 0.75rem;">${status}</span>
+              • ${performed}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="card span-6">
+          <h3>Procedures (${procs.total || procs.entry.length})</h3>
+          ${entries}
+          ${procs.entry.length > 10 ? '<p style="color: var(--muted); margin-top: 8px;">Showing first 10 results</p>' : ''}
+        </div>
+      `;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const ehrLaunchPatientId = urlParams.get('patient');
+
+    if (ehrLaunchPatientId) {
+      selectPatient(ehrLaunchPatientId);
+    } else {
+      fetchTestPatients();
+    }
+  </script>
+</body>
+</html>

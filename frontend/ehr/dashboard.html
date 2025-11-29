@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SimEHR - Electronic Health Record System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f5f7fa;
+      color: #2c3e50;
+    }
+
+    .ehr-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ehr-logo {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .ehr-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .patient-list {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .patient-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 180px;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      align-items: center;
+    }
+
+    .patient-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .launch-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .launch-btn:hover {
+      background: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="ehr-header">
+    <div class="ehr-logo">⚕️ SimEHR</div>
+  </div>
+
+  <div class="ehr-container">
+    <h1 class="page-title">Patient List</h1>
+
+    <div class="patient-list" id="patientList"></div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    const PATIENTS = [
+      { id: 'erXuFYUfucBZaryVksYEcMg3', name: 'Camila Maria Lopez', birthDate: '1987-09-12', gender: 'Female' },
+      { id: 'eq081-VQEgP8drUUqCWzHfw3', name: 'Derrick Lin', birthDate: '1973-06-03', gender: 'Male' }
+    ];
+
+    function launchApp(patientId) {
+      window.open(`${API_BASE}/epic/launch?patient=${patientId}`, 'SmartApp', 'width=1200,height=800');
+    }
+
+    const html = PATIENTS.map(p => `
+      <div class="patient-row">
+        <div class="patient-name">${p.name}</div>
+        <div>${p.birthDate}</div>
+        <div>${p.gender}</div>
+        <button class="launch-btn" onclick="launchApp('${p.id}')">Launch Smart Claims</button>
+      </div>
+    `).join('');
+
+    document.getElementById('patientList').innerHTML = html;
+  </script>
+</body>
+</html>
